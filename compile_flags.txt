@@ -1,0 +1,2 @@
+-DCURL_STATICLIB
+-Iout/build/Visual Studio Community 2026 Release - amd64/_deps/curl-src/include
