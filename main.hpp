@@ -1,24 +1,28 @@
 #pragma once
 #include <iostream>
 #include <curl/curl.h>
-#include <Windows.h>
+#include <windows.h>
+#include <tlhelp32.h>
+#include <fcntl.h>  // _O_U16TEXT 상수가 정의되어 있는 헤더
+#include <io.h>
+#include <string>
 
-class MainCurl
+struct ProcessList
+{
+    int pid;
+    std::wstring exeName;
+};
+
+class Process
 {
 private:
-    CURL* curl;
-    CURLcode res;
+    HANDLE hProcessSnap;
+    HANDLE hProcess;
+
+    PROCESSENTRY32W pe32;
+
+    DWORD dwPriorityClass;
 
 public:
-    MainCurl()
-    {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-    }
-
-    ~MainCurl()
-    {
-        curl_global_cleanup();
-    }
-
-    void CurlHandle(const char inputURL);
+    ProcessList GetProcessList();
 };
