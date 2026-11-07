@@ -1,5 +1,8 @@
 #include "main.hpp"
 #include <algorithm>
+#include <cstddef>
+#include <errhandlingapi.h>
+#include <vector>
 
 /*
 # Debug: C++20, -O0 -g, -Wall -Wextra
@@ -15,74 +18,63 @@ cmake --preset mingw-x64-release
 cmake --build --preset mingw-x64-release
 */
 
-
-/*
-void MainCurl::CurlHandle(const char* inputURL)
+std::vector<ProcessInfo> Process::GetProcessList()
 {
-    curl = curl_easy_init();
-    if(curl) 
+    hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcessSnap == NULL)
     {
-        curl_easy_setopt(curl, CURLOPT_URL, inputURL);
-
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        res = curl_easy_perform(curl);
-
-        if(res != CURLE_OK)
-        {
-            std::cout << stderr << "curl_easy_perform() failed: " << curl_easy_strerror(res);
-            return;
-        }
-
-        curl_easy_cleanup(curl);
-    }
-}
-*/
-
-ProcessInfo Process::GetProcessList()
-{
-    ProcessInfo processList;
-
-    hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
-
-    if( hProcessSnap == INVALID_HANDLE_VALUE )
-    {
-        std::cout << "CreateToolhelp32Snapshot (of processes)" << std::endl;
+        std::cerr << "CreateToolhelp32Snapshot Failed..." << GetLastError() << std::endl;
         return {};
     }
 
-    // Set the size of the structure before using it.
-    pe32.dwSize = sizeof( pe32 );
+    pe32.dwSize = sizeof(PROCESSENTRY32W);
 
-    if( !Process32FirstW( hProcessSnap, &pe32 ) )
+    std::vector<ProcessInfo> processList;
+
+    if (!Process32FirstW(hProcessSnap, &pe32)) 
     {
-        std::cout << "Process32First" << std::endl;
+        std::cerr << "Process32First 실패" << std::endl;
         CloseHandle(hProcessSnap);
         return {};
     }
 
-    do
+    if (Process32FirstW(hProcessSnap, &pe32))
     {
-        /*
-        processList.exeName.push_back(pe32.szExeFile);
-        processList[1] = pe32.th32ProcessID;
-        */
+        do 
+        {   
+            processList.push_back({
+                pe32.szExeFile,
+                pe32.th32ProcessID
+            });
 
-        processList.exeName.push_back(pe32.szExeFile);
-        processList.pid
-
-    } while (Process32NextW(hProcessSnap, &pe32));
+        } while (Process32NextW(hProcessSnap, &pe32));
+    }
 
     return processList;
 }
 
 int main()
 {
-    _setmode(_fileno(stdout), _O_U16TEXT);
-    
+    /*
     Process process;
-    ProcessInfo list = process.GetProcessList();
+    std::vector<ProcessInfo> processlist = process.GetProcessList();
+    
+    if (!processlist.empty())
+    {
+        for (const auto& p : processlist)
+        {
+            std::wcout << L"ProcessName: " << p.exeName
+                    << L" PID: " << p.pid
+                    << L'\n';
+        }
+    } else 
+    {
+        std::cerr << "Empty!" << std::endl;
+        return 1;
+    }
+    */
 
-    std::wcout << list.exeName << std::endl;
+    NetWorkSend networkSend("");
 
     return 0;
 }

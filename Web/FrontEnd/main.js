@@ -1,8 +1,17 @@
 
+const num_list = document.querySelector('#num_list');
 const process_list = document.querySelector('#process_list');
 const test_button = document.querySelector('#test_button')
 
-const newProcess = document.createElement('ul');
+// 임시 목록 데이터 (나중에 백엔드 응답으로 교체)
+const items = ['항목 1', '항목 2', '항목 3'];
+
+process_list.remove();
+for (const text of items) {
+    const li = document.createElement('li');
+    li.textContent = text;
+    num_list.appendChild(li);
+}
 
 test_button.addEventListener('click', async function() {
     try {

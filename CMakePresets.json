@@ -21,6 +21,31 @@
             }
         },
         {
+            "name": "msvc-ninja-debug",
+            "displayName": "MSVC x64 - Ninja - Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "toolset": {
+                "value": "host=x64",
+                "strategy": "external"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": true
+            }
+        },
+        {
             "name": "mingw-x64-debug",
             "displayName": "MinGW-w64 x64 - Debug",
             "description": "Cross-compile for Windows using x86_64-w64-mingw32 GCC",
@@ -52,6 +77,10 @@
             },
             "configurePreset": "Visual Studio Community 2026 Release - amd64",
             "configuration": "Debug"
+        },
+        {
+            "name": "msvc-ninja-debug",
+            "configurePreset": "msvc-ninja-debug"
         },
         {
             "name": "mingw-x64-debug",

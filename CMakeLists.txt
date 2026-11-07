@@ -7,6 +7,8 @@ project(ComputerDefender VERSION 0.1.0 LANGUAGES C CXX)
 # ---------------------------------------------------------------------------
 include(FetchContent)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)

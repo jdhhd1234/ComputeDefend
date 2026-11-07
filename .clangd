@@ -1,2 +1,2 @@
 CompileFlags:
-  CompilationDatabase: out/build/mingw-x64-debug
+  CompilationDatabase: out/build/msvc-ninja-debug

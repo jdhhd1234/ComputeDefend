@@ -5,6 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 
+class ProcessInfo(BaseModel):
+    pid: int
+    name: str
+
 app = FastAPI()
 
 origins = [
@@ -21,6 +25,12 @@ app.add_middleware(
 
 # uv run fastapi dev
 
-@app.get("/")
-async def main():
-    return {"message": "Hello World"}
+@app.post("/api/processes")
+async def main(processinfo: ProcessInfo) -> dict:
+
+    data = {
+        "name": processinfo.name,
+        "pid": processinfo.pid
+    }
+
+    return data
