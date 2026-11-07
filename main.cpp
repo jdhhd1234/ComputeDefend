@@ -1,6 +1,17 @@
 #include "main.hpp"
 
 /*
+# Debug: C++20, -O0 -g, -Wall -Wextra
+cmake --preset mingw-x64-debug
+cmake --build --preset mingw-x64-debug
+
+# Release
+cmake --preset mingw-x64-release
+cmake --build --preset mingw-x64-release
+*/
+
+
+/*
 void MainCurl::CurlHandle(const char* inputURL)
 {
     curl = curl_easy_init();
@@ -24,39 +35,34 @@ void MainCurl::CurlHandle(const char* inputURL)
 
 ProcessList Process::GetProcessList()
 {
-    try 
+    ProcessList processList;
+
+    hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
+
+    if( hProcessSnap == INVALID_HANDLE_VALUE )
     {
-        ProcessList processList;
-
-        hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
-
-        // Set the size of the structure before using it.
-        pe32.dwSize = sizeof( pe32 );
-
-        do 
-        {
-            // std::cout << TEXT("PROCESS NAME: ") << pe32.szExeFile << TEXT("PID: ") << pe32.th32ProcessID << std::endl;
-            processList.exeName = pe32.szExeFile;
-            processList.pid = pe32.th32ProcessID;
-        } while ( Process32NextW( hProcessSnap, &pe32 ) );
-
-        return processList;
-    } 
-    catch (const std::exception& e) 
-    {
-        if( hProcessSnap == INVALID_HANDLE_VALUE )
-        {
-            std::cout << "CreateToolhelp32Snapshot (of processes)" << std::endl;
-            return {};
-        }
-
-        if( !Process32FirstW( hProcessSnap, &pe32 ) )
-        {
-            std::cout << "Process32First" << std::endl;
-            CloseHandle(hProcessSnap);
-            return {};
-        }
+        std::cout << "CreateToolhelp32Snapshot (of processes)" << std::endl;
+        return {};
     }
+
+    // Set the size of the structure before using it.
+    pe32.dwSize = sizeof( pe32 );
+
+    if( !Process32First( hProcessSnap, &pe32 ) )
+    {
+        std::cout << "Process32First" << std::endl;
+        CloseHandle(hProcessSnap);
+        return {};
+    }
+
+    do 
+    {
+        // std::cout << TEXT("PROCESS NAME: ") << pe32.szExeFile << TEXT("PID: ") << pe32.th32ProcessID << std::endl;
+        processList.exeName = pe32.szExeFile;
+        processList.pid = pe32.th32ProcessID;
+    } while ( Process32Next( hProcessSnap, &pe32 ) );
+
+    return processList;
 }
 
 int main()
@@ -67,6 +73,6 @@ int main()
 
     ProcessList list = process.GetProcessList();
 
-    std::wcout << list.exeName << std::endl;
+    std::cout << list.exeName << std::endl;
     return 0;
 }

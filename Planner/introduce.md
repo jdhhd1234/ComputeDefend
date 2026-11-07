@@ -23,6 +23,8 @@
 	특정 시간이 지나면 꺼지는 타이머 역할
 
 - Python
-	HTML/CSS/JS의 백엔드 서버
-	
+	HTML/CSS/JS의 백엔드 서버.
 	부모님 제어 클라이언트 요청에 따라서 메세지를 받고 C++언어 네트워크로 보내는 중간자 역할.
+
+- HTML/CSS/JS
+	Python요청받고 Web FrontEnd에 표시하는 역할.

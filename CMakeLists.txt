@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.24)
 project(ComputerDefender VERSION 0.1.0 LANGUAGES C CXX)
 
 # ---------------------------------------------------------------------------
@@ -37,4 +37,22 @@ FetchContent_MakeAvailable(curl)
 
 add_executable(ComputerDefender main.cpp
     main.hpp)
+target_compile_features(ComputerDefender PRIVATE cxx_std_20)
+set_target_properties(ComputerDefender PROPERTIES CXX_EXTENSIONS OFF)
+
+if(MSVC)
+    target_compile_options(ComputerDefender PRIVATE /W4)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(ComputerDefender PRIVATE
+        -Wall -Wextra
+        $<$<CONFIG:Debug>:-O0>
+        $<$<CONFIG:Debug>:-g>
+    )
+endif()
+
+if(MINGW)
+    # Avoid requiring MinGW runtime DLLs on the destination Windows machine.
+    target_link_options(ComputerDefender PRIVATE -static)
+endif()
+
 target_link_libraries(ComputerDefender PRIVATE CURL::libcurl)

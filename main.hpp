@@ -10,7 +10,7 @@
 struct ProcessList
 {
     int pid;
-    std::wstring exeName;
+    std::string exeName;
 };
 
 class Process
@@ -19,7 +19,7 @@ private:
     HANDLE hProcessSnap;
     HANDLE hProcess;
 
-    PROCESSENTRY32W pe32;
+    PROCESSENTRY32 pe32;
 
     DWORD dwPriorityClass;
 
