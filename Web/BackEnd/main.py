@@ -12,7 +12,8 @@ class ProcessInfo(BaseModel):
 app = FastAPI()
 
 origins = [
-    "http://127.0.0.1:5500/"
+    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8000"
 ]
 
 app.add_middleware(
@@ -24,6 +25,10 @@ app.add_middleware(
 )
 
 # uv run fastapi dev
+
+@app.get("/")
+def main():
+    return {"Hello": "World"}
 
 @app.post("/api/processes")
 async def main(processinfo: ProcessInfo) -> dict:

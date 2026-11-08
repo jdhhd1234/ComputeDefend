@@ -74,7 +74,7 @@ int main()
     }
     */
 
-    NetWorkSend networkSend("");
+    NetWorkSend networkSend("http://127.0.0.1:8000/api/processes");
 
     return 0;
 }
