@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -48,9 +49,21 @@ std::string NetWorkSendServer::ToUtf8(const std::wstring& wide)
     return utf8;
 }
 
+static std::string GetEnvOr(const char* name, const std::string& fallback)
+{
+    char* value = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) return fallback;
+
+    std::string result(value);
+    free(value);
+    return result;
+}
+
 void NetWorkSendServer::SendServerPost(cpr::Url url)
 {
     std::vector<ProcessInfo> process_list = process.GetProcessList();
+    const std::string api_key = GetEnvOr("COMPUTER_DEFENDER_API_KEY", "");
 
     for (const ProcessInfo& process_info : process_list)
     {
@@ -61,7 +74,7 @@ void NetWorkSendServer::SendServerPost(cpr::Url url)
 
         response = cpr::Post(
             url,
-            cpr::Header{{"Content-Type", "application/json"}},
+            cpr::Header{{"Content-Type", "application/json"}, {"X-API-Key", api_key}},
             cpr::Body{json_data.dump()}
         );
 
@@ -75,7 +88,9 @@ int main()
 {
     NetWorkSendServer server_send;
 
-    server_send.SendServerPost({"http://127.0.0.1:8000/api/processes"});
+    const std::string server_url = GetEnvOr("COMPUTER_DEFENDER_URL", "http://127.0.0.1:8000");
+
+    server_send.SendServerPost(cpr::Url{server_url + "/api/processes"});
 
     /*
     while (true) {
