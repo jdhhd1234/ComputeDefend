@@ -1,1 +1,4 @@
-out
+out/
+__pycache__/
+compile_commands.json
+.vercel/

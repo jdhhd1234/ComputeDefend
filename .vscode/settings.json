@@ -1,3 +1,19 @@
 {
-    "C_Cpp.intelliSenseEngine": "disabled"
+    "python.defaultInterpreterPath": "C:\\Users\\kym10\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.python",
+        "editor.formatOnSave": true
+    },
+
+    "cmake.generator": "Ninja",
+    "cmake.preferredGenerators": ["Ninja"],
+    "cmake.buildDirectory": "${workspaceFolder}/out/build/ComputerDefender",
+    "cmake.configureOnOpen": true,
+    "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.associations": {
+        "*.h": "cpp"
+    }
 }
