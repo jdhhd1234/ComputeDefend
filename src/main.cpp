@@ -75,11 +75,15 @@ int main()
 {
     NetWorkSendServer server_send;
 
+    server_send.SendServerPost({"http://127.0.0.1:8000/api/processes"});
+
+    /*
     while (true) {
         server_send.SendServerPost({"http://127.0.0.1:8000/api/processes"});
         // 10초 동안 스레드를 일시 중지
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
+    */
 
     return 0;
 }
