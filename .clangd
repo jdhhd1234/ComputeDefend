@@ -1,2 +1,2 @@
 CompileFlags:
-  CompilationDatabase: out/build/msvc-ninja-debug
+  CompilationDatabase: out/build/clangd
