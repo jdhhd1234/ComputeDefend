@@ -1,9 +1,8 @@
 import os
 import secrets
 import subprocess
-from pathlib import Path
 
-import redis
+from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,18 +15,14 @@ class ProcessInfo(BaseModel):
 
 app = FastAPI()
 
-REDIS_URL = os.getenv("REDIS_URL") or os.getenv("KV_URL")
 API_KEY = os.getenv("API_KEY")
-PROCESSES_KEY = "processes"
 
 # 설정이 빠진 채 공개되면 인증 없이 열리므로 Vercel에서는 시작을 막는다.
-if os.getenv("VERCEL") and not (REDIS_URL and API_KEY):
-    raise RuntimeError("Vercel 환경변수 REDIS_URL과 API_KEY를 설정해야 합니다.")
+if os.getenv("VERCEL") and not API_KEY:
+    raise RuntimeError("Vercel 환경변수 API_KEY를 설정해야 합니다.")
 
-# 서버리스 함수는 요청 간 메모리를 공유하지 않으므로 Vercel에서는 Redis에 저장한다.
-redis_client = redis.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
-
-# 로컬 개발용 저장소. PID를 키로 저장해 C++ 클라이언트를 다시 실행해도 중복되지 않게 한다.
+# 메모리 저장소. C++ 클라이언트가 보낸 최신 앱 목록으로 통째로 교체해 종료된 앱이 남지 않게 한다.
+# Vercel에서는 인스턴스마다 따로 존재하고 인스턴스가 종료되면 사라진다.
 processes: dict[int, dict] = {}
 
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -51,28 +46,21 @@ app.add_middleware(
 )
 
 # uv run fastapi dev
+# fastapi dev src/Web/BackEnd/main.py
 
 @app.post("/api/processes", dependencies=[Depends(require_api_key)])
-def main(processinfo: ProcessInfo) -> dict:
+def main(processinfos: list[ProcessInfo]) -> list[dict]:
+    global processes
 
-    data = {
-        "name": processinfo.name,
-        "pid": processinfo.pid
+    processes = {
+        info.pid: {"name": info.name, "pid": info.pid}
+        for info in processinfos
     }
 
-    if redis_client:
-        redis_client.hset(PROCESSES_KEY, str(processinfo.pid), processinfo.name)
-    else:
-        processes[processinfo.pid] = data
-
-    return data
+    return list(processes.values())
 
 @app.get("/api/processes", dependencies=[Depends(require_api_key)])
 def get_processes() -> list[dict]:
-    if redis_client:
-        stored = redis_client.hgetall(PROCESSES_KEY)
-        return [{"name": stored[pid], "pid": int(pid)} for pid in sorted(stored, key=int)]
-
     return list(processes.values())
 
 # API 라우트보다 뒤에 둬야 /api 경로를 가리지 않는다.

@@ -38,5 +38,6 @@ private:
 public:
     void SendServerPost(cpr::Url url);
 
+    static std::string GetEnvOr(const char* name, const std::string& fallback);
     static std::string ToUtf8(const std::wstring& wide);
 };
