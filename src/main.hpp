@@ -1,6 +1,7 @@
 #pragma once
 #include "cpr/cprtypes.h"
 #include <windows.h>
+#include <chrono>
 #include <string>
 #include <tlhelp32.h>
 #include <vector>
@@ -32,6 +33,8 @@ class NetWorkSendServer
 private:
     cpr::Response response;
     nlohmann::json json_data;
+    nlohmann::json last_sent_data;
+    std::chrono::steady_clock::time_point last_sent_time{};
 
     Process process;
 

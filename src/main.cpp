@@ -108,11 +108,23 @@ void NetWorkSendServer::SendServerPost(cpr::Url url)
         });
     }
 
+    // 목록이 그대로면 보내지 않는다. 서버 메모리가 초기화될 수 있으니 30초마다는 다시 보낸다.
+    const auto now = std::chrono::steady_clock::now();
+    if (json_data == last_sent_data && now - last_sent_time < std::chrono::seconds(30))
+        return;
+
     response = cpr::Post(
         url,
         cpr::Header{{"Content-Type", "application/json"}, {"X-API-Key", api_key}},
         cpr::Body{json_data.dump()}
     );
+
+    // 전송에 실패하면 다음 확인 때 다시 보내도록 기록하지 않는다.
+    if (response.status_code == 200)
+    {
+        last_sent_data = json_data;
+        last_sent_time = now;
+    }
 
     // 3. 응답 결과 확인
     std::cout << "Status Code: " << response.status_code << '\n';
@@ -125,10 +137,11 @@ int main()
 
     const std::string server_url = server_send.GetEnvOr("COMPUTER_DEFENDER_URL", "http://127.0.0.1:8000");
 
-    while (true) {
+    while (true) 
+    {
         server_send.SendServerPost(cpr::Url{server_url + "/api/processes"});
-        // 10초 동안 스레드를 일시 중지
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        // 1초마다 확인하고, 바뀌었을 때만 실제로 전송한다.
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     return 0;
