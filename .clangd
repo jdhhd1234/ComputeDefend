@@ -1,2 +1,2 @@
 CompileFlags:
-  CompilationDatabase: out/build/clangd
+  CompilationDatabase: out/build/ninja-debug

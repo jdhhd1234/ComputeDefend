@@ -69,6 +69,58 @@ std::vector<ProcessInfo> Process::GetProcessList()
     return processList;
 }
 
+ProcessHandle::ProcessHandle(DWORD pid, DWORD access)
+    : handle(OpenProcess(access, FALSE, pid))
+{
+}
+
+ProcessHandle::~ProcessHandle()
+{
+    if (handle != nullptr)
+        CloseHandle(handle);
+}
+
+bool ProcessHandle::IsValid() const
+{
+    return handle != nullptr;
+}
+
+bool ProcessHandle::Terminate(UINT exitCode) const
+{
+    return handle != nullptr && TerminateProcess(handle, exitCode) != FALSE;
+}
+
+bool Process::KillProcess(const std::wstring& exeName, DWORD pid)
+{
+    // 서버에서 온 정보를 그대로 믿지 않고, 지금 실제 목록에 있는지 확인한다.
+    std::vector<ProcessInfo> processList = GetProcessList();
+
+    for (const ProcessInfo& info : processList)
+    {
+        if (info.pid != pid || info.exeName != exeName)
+            continue;
+
+        ProcessHandle target(pid, PROCESS_TERMINATE);
+
+        if (!target.IsValid())
+        {
+            std::cerr << "OpenProcess Failed: " << GetLastError() << '\n';
+            return false;
+        }
+
+        if (!target.Terminate(1))
+        {
+            std::cerr << "TerminateProcess Failed: " << GetLastError() << '\n';
+            return false;
+        }
+
+        return true;
+    }
+
+    std::cerr << "Process Not Found: PID " << pid << '\n';
+    return false;
+}
+
 std::string NetWorkSendServer::ToUtf8(const std::wstring& wide)
 {
     if (wide.empty()) return {};
@@ -77,6 +129,16 @@ std::string NetWorkSendServer::ToUtf8(const std::wstring& wide)
     std::string utf8(size, '\0');
     WideCharToMultiByte(CP_UTF8, 0, wide.data(), length, utf8.data(), size, nullptr, nullptr);
     return utf8;
+}
+
+std::wstring NetWorkSendServer::FromUtf8(const std::string& utf8)
+{
+    if (utf8.empty()) return {};
+    const int length = static_cast<int>(utf8.size());
+    const int size = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), length, nullptr, 0);
+    std::wstring wide(size, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.data(), length, wide.data(), size);
+    return wide;
 }
 
 std::string NetWorkSendServer::GetEnvOr(const char* name, const std::string& fallback)
@@ -131,6 +193,39 @@ void NetWorkSendServer::SendServerPost(cpr::Url url)
     std::cout << "Response Body: " << response.text << '\n';
 }
 
+void NetWorkSendServer::ReceiveCommands(cpr::Url url)
+{
+    const std::string api_key = GetEnvOr("COMPUTER_DEFENDER_API_KEY", "");
+
+    cpr::Response command_response = cpr::Get(
+        url,
+        cpr::Header{{"X-API-Key", api_key}}
+    );
+
+    if (command_response.status_code != 200)
+        return;
+
+    // 형식이 틀린 응답이 와도 프로그램이 죽지 않도록 예외 없이 파싱한다.
+    nlohmann::json commands = nlohmann::json::parse(command_response.text, nullptr, false);
+    if (!commands.is_array())
+        return;
+
+    for (const nlohmann::json& command : commands)
+    {
+        if (!command.contains("name") || !command["name"].is_string()
+            || !command.contains("pid") || !command["pid"].is_number_unsigned())
+            continue;
+
+        const std::wstring name = FromUtf8(command["name"].get<std::string>());
+        const DWORD pid = command["pid"].get<DWORD>();
+
+        const bool killed = process.KillProcess(name, pid);
+        std::cout << "Kill " << command["name"].get<std::string>()
+                  << " (PID: " << pid << "): "
+                  << (killed ? "OK" : "FAILED") << '\n';
+    }
+}
+
 int main()
 {
     NetWorkSendServer server_send;
@@ -140,6 +235,7 @@ int main()
     while (true) 
     {
         server_send.SendServerPost(cpr::Url{server_url + "/api/processes"});
+        server_send.ReceiveCommands(cpr::Url{server_url + "/api/commands"});
         // 1초마다 확인하고, 바뀌었을 때만 실제로 전송한다.
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
