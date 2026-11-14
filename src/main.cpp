@@ -343,7 +343,7 @@ int main()
     NetWorkSendServer server_send;
 
     const std::string server_url = server_send.GetEnvOr("COMPUTER_DEFEND_URL", "");
-
+    
     std::cout << server_url << std::endl;
 
     while (true) 
