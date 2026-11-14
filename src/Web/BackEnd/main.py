@@ -30,46 +30,74 @@ if os.getenv("VERCEL") and not API_KEY:
 
 # ---------------------------------------------------------------------------
 # 저장소
-# Vercel은 인스턴스가 여러 개라 메모리를 공유하지 못한다. 그래서 Redis(Upstash)에
-# 프로세스 목록과 종료 명령 큐를 둔다. Redis 환경변수가 없으면(로컬) 메모리를 쓴다.
+# Vercel은 인스턴스가 여러 개라 메모리를 공유하지 못한다. 그래서 Supabase(Postgres)에
+# 프로세스 목록과 종료 명령 큐를 둔다. DATABASE_URL이 없으면(로컬) 메모리를 쓴다.
+# 테이블은 Data API에 노출되지 않는 computer_defender 스키마에 있다.
 # ---------------------------------------------------------------------------
 
-PROCESSES_KEY = "computer_defender:processes"
-COMMANDS_KEY = "computer_defender:commands"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Vercel Marketplace의 Upstash는 KV_REST_API_* 이름으로, Upstash 콘솔은 UPSTASH_REDIS_REST_* 이름으로 준다.
-REDIS_URL = os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("KV_REST_API_URL")
-REDIS_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or os.getenv("KV_REST_API_TOKEN")
-
-# 여러 인스턴스에서 목록이 서로 달라지지 않게 Vercel에서는 Redis를 필수로 한다.
-if os.getenv("VERCEL") and not (REDIS_URL and REDIS_TOKEN):
-    raise RuntimeError("Vercel에서 Upstash Redis 환경변수(KV_REST_API_URL, KV_REST_API_TOKEN)를 설정해야 합니다.")
+# 여러 인스턴스에서 목록이 서로 달라지지 않게 Vercel에서는 DB를 필수로 한다.
+if os.getenv("VERCEL") and not DATABASE_URL:
+    raise RuntimeError("Vercel 환경변수 DATABASE_URL(Supabase 풀러 주소)을 설정해야 합니다.")
 
 
-class RedisStore:
-    def __init__(self, url: str, token: str):
-        from upstash_redis.asyncio import Redis
+class PostgresStore:
+    def __init__(self, url: str):
+        from psycopg_pool import AsyncConnectionPool
 
-        self.redis = Redis(url=url, token=token, allow_telemetry=False)
+        # Supabase 트랜잭션 풀러(6543)는 prepared statement를 지원하지 않으므로 끈다.
+        self.pool = AsyncConnectionPool(
+            url,
+            min_size=0,
+            max_size=5,
+            open=False,
+            kwargs={"autocommit": True, "prepare_threshold": None},
+        )
+        self._opened = False
+
+    async def _conn(self):
+        if not self._opened:
+            await self.pool.open()
+            self._opened = True
+        return self.pool.connection()
 
     async def get_processes(self) -> list[dict]:
-        raw = await self.redis.get(PROCESSES_KEY)
-        return json.loads(raw) if raw else []
+        async with await self._conn() as conn:
+            cur = await conn.execute("select data from computer_defender.process_snapshot where id = 1")
+            row = await cur.fetchone()
+        return row[0] if row else []
 
     async def set_processes(self, data: list[dict]) -> None:
-        await self.redis.set(PROCESSES_KEY, json.dumps(data))
+        async with await self._conn() as conn:
+            await conn.execute(
+                "update computer_defender.process_snapshot set data = %s::jsonb, updated_at = now() where id = 1",
+                (json.dumps(data),),
+            )
 
     async def push_command(self, command: dict) -> None:
-        await self.redis.rpush(COMMANDS_KEY, json.dumps(command))
+        async with await self._conn() as conn:
+            await conn.execute(
+                "insert into computer_defender.commands (name, pid) values (%s, %s)",
+                (command["name"], command["pid"]),
+            )
 
     async def take_commands(self) -> list[dict]:
-        # LPOP count는 원자적이라 C++이 두 번 가져가도 같은 명령이 중복 실행되지 않는다.
-        raw = await self.redis.lpop(COMMANDS_KEY, 100)
-        if not raw:
-            return []
-        if isinstance(raw, str):
-            raw = [raw]
-        return [json.loads(item) for item in raw]
+        # DELETE ... RETURNING은 원자적이라 C++이 두 번 가져가도 같은 명령이 중복 실행되지 않는다.
+        async with await self._conn() as conn:
+            cur = await conn.execute(
+                """
+                delete from computer_defender.commands
+                where id in (
+                    select id from computer_defender.commands
+                    order by id limit 100
+                    for update skip locked
+                )
+                returning id, name, pid
+                """
+            )
+            rows = await cur.fetchall()
+        return [{"name": name, "pid": pid} for _, name, pid in sorted(rows)]
 
 
 class MemoryStore:
@@ -91,7 +119,7 @@ class MemoryStore:
         return commands
 
 
-store = RedisStore(REDIS_URL, REDIS_TOKEN) if REDIS_URL and REDIS_TOKEN else MemoryStore()
+store = PostgresStore(DATABASE_URL) if DATABASE_URL else MemoryStore()
 
 
 def is_valid_key(key: str | None) -> bool:
