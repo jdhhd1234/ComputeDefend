@@ -9,6 +9,7 @@
 #include "cpr/api.h"
 
 #include <dwmapi.h>
+
 #pragma comment(lib, "dwmapi.lib")
 
 std::vector<ProcessInfo> Process::GetProcessList()
@@ -35,8 +36,7 @@ std::vector<ProcessInfo> Process::GetProcessList()
         return TRUE;
     }, reinterpret_cast<LPARAM>(&appPids));
 
-    HANDLE snapshot =
-        CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (snapshot == INVALID_HANDLE_VALUE)
     {
@@ -157,6 +157,7 @@ std::string NetWorkSendServer::GetEnvOr(const char* name, const std::string& fal
 void NetWorkSendServer::SendServerPost(cpr::Url url)
 {
     std::vector<ProcessInfo> process_list = process.GetProcessList();
+
     const std::string api_key = GetEnvOr("COMPUTER_DEFENDER_API_KEY", "");
 
     // 전체 목록을 한 번에 보내야 서버가 종료된 앱을 목록에서 뺄 수 있다.
@@ -178,8 +179,16 @@ void NetWorkSendServer::SendServerPost(cpr::Url url)
     response = cpr::Post(
         url,
         cpr::Header{{"Content-Type", "application/json"}, {"X-API-Key", api_key}},
-        cpr::Body{json_data.dump()}
+        cpr::Body{json_data.dump()},
+        cpr::Timeout{REQUEST_TIMEOUT}
     );
+
+    // 타임아웃이나 연결 실패는 status_code가 0이고 이유는 error에 담긴다.
+    if (response.error)
+    {
+        std::cerr << "POST Failed: " << response.error.message << '\n';
+        return;
+    }
 
     // 전송에 실패하면 다음 확인 때 다시 보내도록 기록하지 않는다.
     if (response.status_code == 200)
@@ -199,8 +208,15 @@ void NetWorkSendServer::ReceiveCommands(cpr::Url url)
 
     cpr::Response command_response = cpr::Get(
         url,
-        cpr::Header{{"X-API-Key", api_key}}
+        cpr::Header{{"X-API-Key", api_key}},
+        cpr::Timeout{REQUEST_TIMEOUT}
     );
+
+    if (command_response.error)
+    {
+        std::cerr << "GET Commands Failed: " << command_response.error.message << '\n';
+        return;
+    }
 
     if (command_response.status_code != 200)
         return;
@@ -230,7 +246,9 @@ int main()
 {
     NetWorkSendServer server_send;
 
-    const std::string server_url = server_send.GetEnvOr("COMPUTER_DEFENDER_URL", "http://127.0.0.1:8000");
+    const std::string server_url = server_send.GetEnvOr("COMPUTER_DEFEND_URL", "");
+
+    std::cout << server_url << std::endl;
 
     while (true) 
     {

@@ -49,6 +49,9 @@ public:
 class NetWorkSendServer
 {
 private:
+    // 서버가 응답하지 않아도 루프가 멈추지 않도록 요청마다 최대 대기 시간을 둔다.
+    static constexpr std::chrono::milliseconds REQUEST_TIMEOUT{5000};
+
     cpr::Response response;
     nlohmann::json json_data;
     nlohmann::json last_sent_data;
