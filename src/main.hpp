@@ -29,6 +29,22 @@ public:
     bool Terminate(UINT exitCode) const;
 };
 
+// 관리자 권한 확인/요청과 SeDebugPrivilege 활성화.
+// 다른 사용자나 높은 권한으로 실행된 프로세스를 TerminateProcess로 종료하려면 필요하다.
+class Privilege
+{
+public:
+    // 현재 프로세스 토큰이 관리자 권한으로 상승(elevated)돼 있는지 확인한다.
+    static bool IsRunningAsAdmin();
+
+    // UAC 창을 띄워 같은 exe를 관리자 권한으로 다시 실행한다.
+    // 새 프로세스가 시작되면 true, 사용자가 취소하거나 실패하면 false.
+    static bool RelaunchAsAdmin();
+
+    // 관리자 토큰에 들어 있지만 꺼져 있는 SeDebugPrivilege를 켠다.
+    static bool EnableDebugPrivilege();
+};
+
 class Process
 {
 private:
@@ -44,6 +60,8 @@ public:
 
     // 현재 목록에서 이름과 PID가 모두 일치하는 프로세스를 찾아 종료한다.
     bool KillProcess(const std::wstring& exeName, DWORD pid);
+
+    void RequestAdminPrivileges();
 };
 
 class NetWorkSendServer

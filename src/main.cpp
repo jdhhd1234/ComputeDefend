@@ -9,9 +9,90 @@
 #include "cpr/api.h"
 
 #include <dwmapi.h>
+#include <shellapi.h>
 
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "shell32.lib")
 
+bool Privilege::IsRunningAsAdmin()
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        return false;
+
+    TOKEN_ELEVATION elevation{};
+    DWORD size = 0;
+    const bool ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) != FALSE;
+
+    CloseHandle(token);
+    return ok && elevation.TokenIsElevated != 0;
+}
+
+bool Privilege::RelaunchAsAdmin()
+{
+    wchar_t exePath[MAX_PATH]{};
+    if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0)
+        return false;
+
+    wchar_t currentDir[MAX_PATH]{};
+    GetCurrentDirectoryW(MAX_PATH, currentDir);
+
+    SHELLEXECUTEINFOW info{};
+    info.cbSize = sizeof(info);
+    info.lpVerb = L"runas";          // UAC 상승 요청
+    info.lpFile = exePath;
+    info.lpDirectory = currentDir;
+    info.nShow = SW_SHOWNORMAL;
+
+    if (!ShellExecuteExW(&info))
+    {
+        // 사용자가 UAC 창에서 '아니요'를 누르면 ERROR_CANCELLED(1223)
+        std::cerr << "Relaunch As Admin Failed: " << GetLastError() << '\n';
+        return false;
+    }
+
+    return true;
+}
+
+bool Privilege::EnableDebugPrivilege()
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token))
+        return false;
+
+    TOKEN_PRIVILEGES privileges{};
+    privileges.PrivilegeCount = 1;
+    privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    bool ok = LookupPrivilegeValueW(nullptr, SE_DEBUG_NAME, &privileges.Privileges[0].Luid) != FALSE
+        && AdjustTokenPrivileges(token, FALSE, &privileges, sizeof(privileges), nullptr, nullptr) != FALSE
+        // AdjustTokenPrivileges는 일부만 적용돼도 성공을 반환하므로 따로 확인한다.
+        && GetLastError() != ERROR_NOT_ALL_ASSIGNED;
+
+    CloseHandle(token);
+    return ok;
+}
+
+void Process::RequestAdminPrivileges() 
+{
+    wchar_t szPath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, szPath, ARRAYSIZE(szPath))) 
+    {
+        // "runas" 동사를 사용하여 UAC 권한 상승 창 호출
+        SHELLEXECUTEINFOW sei = { sizeof(sei) };
+        sei.lpVerb = L"runas";
+        sei.lpFile = szPath;
+        sei.hwnd = NULL;
+        sei.nShow = SW_NORMAL;
+
+        if (ShellExecuteExW(&sei)) 
+        {
+            // 권한 상승된 새 프로세스가 실행되었으므로 현재 프로세스 종료
+            ExitProcess(0);
+        }
+    }
+}
 std::vector<ProcessInfo> Process::GetProcessList()
 {
     // 작업 관리자의 '앱'처럼 화면에 보이는 최상위 창을 가진 프로세스의 PID만 모은다.
@@ -244,6 +325,21 @@ void NetWorkSendServer::ReceiveCommands(cpr::Url url)
 
 int main()
 {
+    // 관리자 권한이 없으면 UAC로 다시 실행하고 지금 프로세스는 끝낸다.
+    if (!Privilege::IsRunningAsAdmin())
+    {
+        std::cout << "Not running as administrator. Requesting elevation..." << std::endl;
+
+        if (Privilege::RelaunchAsAdmin())
+            return 0;
+
+        std::cerr << "Continuing without administrator rights. Some processes cannot be terminated.\n";
+    }
+    else if (!Privilege::EnableDebugPrivilege())
+    {
+        std::cerr << "Enable SeDebugPrivilege Failed: " << GetLastError() << '\n';
+    }
+
     NetWorkSendServer server_send;
 
     const std::string server_url = server_send.GetEnvOr("COMPUTER_DEFEND_URL", "");
